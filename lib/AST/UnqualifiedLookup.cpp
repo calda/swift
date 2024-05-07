@@ -389,6 +389,13 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
     return nullptr;
   }
 
+  auto selfDecl = ASTScope::lookupSingleLocalDecl(
+      DC->getParentSourceFile(), DeclName(Ctx.Id_self), Loc);
+
+  if (!selfDecl) {
+    return nullptr;
+  }
+
   bool capturesSelfWeakly = false;
   if (auto decl = closureExpr->getCapturedSelfDecl()) {
     if (auto a = decl->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
@@ -408,7 +415,8 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   }
 
   // In Swift 5 mode, implicit self is allowed within non-escaping
-  // closures even before self is unwrapped. For example, this is allowed:
+  // `weak self` closures even before self is unwrapped.
+  // For example, this is allowed:
   //
   //   doVoidStuffNonEscaping { [weak self] in
   //     method() // implicitly `self.method()`
@@ -416,7 +424,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   //
   // To support this, we have to preserve the lookup behavior from
   // Swift 5.7 and earlier where implicit self defaults to the closure's
-  // `ParamDecl`. This causes the closure to capture self strongly, however,
+  // `ParamDecl`. This causes the closure to capture self strongly,
   // which is not acceptable for escaping closures.
   //
   // Escaping closures, however, only need to permit implicit self once
