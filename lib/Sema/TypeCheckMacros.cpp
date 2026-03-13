@@ -585,9 +585,13 @@ bool swift::isInvalidAttachedMacro(MacroRole role,
 
   case MacroRole::Preamble:
   case MacroRole::Body:
-    // Only function declarations.
+    // Only function declarations or computed variables (with only a getter, but no setter)
     if (isa<AbstractFunctionDecl>(attachedTo))
       return false;
+
+    if (auto *var = dyn_cast<VarDecl>(attachedTo))
+      if (!var->hasStorage() && !var->isSettable(/*useDC=*/nullptr))
+        return false;
 
     break;
   }
@@ -1945,28 +1949,41 @@ std::optional<unsigned>
 ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
                                  AnyFunctionRef fn) const {
   std::optional<unsigned> bufferID;
-  fn.forEachAttachedMacro(
-      MacroRole::Body,
-      [&](CustomAttr *customAttr, MacroDecl *macro) {
-        // FIXME: Should we complain if we already expanded a body macro?
-        if (bufferID)
-          return;
 
-        SourceFile * macroSourceFile = nullptr;
-        if (auto *fnDecl = fn.getAbstractFunctionDecl()) {
-          macroSourceFile = ::evaluateAttachedMacro(
-              macro, fnDecl, customAttr, false, MacroRole::Body);
-        } else if (auto *closure =
-            dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
-          macroSourceFile = ::evaluateAttachedMacro(
-              macro, closure, customAttr, MacroRole::Body);
-        }
+  auto expandMacro = [&](CustomAttr *customAttr, MacroDecl *macro) {
+    // FIXME: Should we complain if we already expanded a body macro?
+    if (bufferID)
+      return;
 
-        if (!macroSourceFile)
-          return;
+    SourceFile *macroSourceFile = nullptr;
+    if (auto *fnDecl = fn.getAbstractFunctionDecl()) {
+      macroSourceFile = ::evaluateAttachedMacro(
+          macro, fnDecl, customAttr, false, MacroRole::Body);
+    } else if (auto *closure =
+        dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
+      macroSourceFile = ::evaluateAttachedMacro(
+          macro, closure, customAttr, MacroRole::Body);
+    }
 
-        bufferID = macroSourceFile->getBufferID();
-      });
+    if (!macroSourceFile)
+      return;
+
+    bufferID = macroSourceFile->getBufferID();
+  };
+
+  // Body macros on a computed getter-only var are attached to the VarDecl,
+  // not to the implicit getter accessor.
+  if (auto *afd = fn.getAbstractFunctionDecl()) {
+    if (auto *accessor = dyn_cast<AccessorDecl>(afd);
+        accessor && accessor->isGetter()) {
+      if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
+        var->forEachAttachedMacro(MacroRole::Body, expandMacro);
+        return bufferID;
+      }
+    }
+  }
+
+  fn.forEachAttachedMacro(MacroRole::Body, expandMacro);
 
   return bufferID;
 }

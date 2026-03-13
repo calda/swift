@@ -2741,6 +2741,20 @@ struct EmptyBodyMacro: BodyMacro {
   }
 }
 
+public struct PrintBodyMacro: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    let originalBody = declaration.body.map { Array($0.statements) } ?? []
+    return [
+      #"print("start body (from macro)")"#,
+      #"defer { print("end body (from macro)") }"#,
+    ] + originalBody
+  }
+}
+
 @_spi(ExperimentalLanguageFeatures)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(

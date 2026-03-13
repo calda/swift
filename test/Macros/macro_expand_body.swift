@@ -14,6 +14,9 @@
 @attached(body)
 macro Remote() = #externalMacro(module: "MacroDefinition", type: "RemoteBodyMacro")
 
+@attached(body)
+macro Print() = #externalMacro(module: "MacroDefinition", type: "PrintBodyMacro")
+
 @attached(preamble)
 macro Traced() = #externalMacro(module: "MacroDefinition", type: "TracedPreambleMacro")
 
@@ -103,3 +106,27 @@ print(try await g(a: 5, b: "World"))
 // CHECK: --- use it
 // CHECK: Logger exiting useLogger()
 useLogger()
+
+@Print
+var computedVar: Bool {
+  print("hello from computedVar")
+  return true
+}
+
+var computedVarWithMacroOnGetter: Bool {
+  @Print
+  get {
+    print("hello from computedVarWithMacroOnGetter")
+    return true
+  }
+}
+
+// CHECK: start body (from macro)
+// CHECK-NEXT: hello from computedVar
+// CHECK-NEXT: end body (from macro)
+_ = computedVar
+
+// CHECK: start body (from macro)
+// CHECK-NEXT: hello from computedVarWithMacroOnGetter
+// CHECK-NEXT: end body (from macro)
+_ = computedVarWithMacroOnGetter
