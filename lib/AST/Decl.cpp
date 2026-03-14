@@ -533,18 +533,7 @@ unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
     llvm::SmallDenseMap<Identifier, unsigned> nextDiscriminator;
     std::optional<unsigned> foundDiscriminator;
 
-    // For getter accessors with body macros, the attr is on the parent VarDecl.
-    const Decl *declToSearch = this;
-    if (role == MacroRole::Body) {
-      if (auto *accessor = dyn_cast<AccessorDecl>(this);
-          accessor && accessor->isGetter()) {
-        if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
-          declToSearch = var;
-        }
-      }
-    }
-
-    declToSearch->forEachAttachedMacro(
+    forEachAttachedMacro(
         role, [&](CustomAttr *foundAttr, MacroDecl *foundMacro) {
           unsigned discriminator =
               nextDiscriminator[foundMacro->getBaseIdentifier()]++;
@@ -552,8 +541,19 @@ unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
             foundDiscriminator = discriminator;
         });
 
-    if (foundDiscriminator)
+    if (foundDiscriminator) {
       return *foundDiscriminator;
+    }
+    
+    // For computed properties with only an implicit get,
+    // the attr is on the parent VarDecl.
+    if (role == MacroRole::Body) {
+      if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
+        if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
+          return var->getAttachedMacroDiscriminator(macroName, role, attr);
+        }
+      }
+    }
   }
 
   // If that failed, conjure up a discriminator.

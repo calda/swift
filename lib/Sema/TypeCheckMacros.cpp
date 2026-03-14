@@ -1973,12 +1973,14 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
 
   // Body macros on a computed getter-only var are attached to the VarDecl,
   // not to the implicit getter accessor.
-  if (auto *afd = fn.getAbstractFunctionDecl()) {
-    if (auto *accessor = dyn_cast<AccessorDecl>(afd);
-        accessor && accessor->isGetter()) {
+  if (auto *functionDecl = fn.getAbstractFunctionDecl()) {
+    if (auto *accessor = dyn_cast<AccessorDecl>(functionDecl)) {
       if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
         var->forEachAttachedMacro(MacroRole::Body, expandMacro);
-        return bufferID;
+        
+        if (bufferID) {
+          return bufferID;
+        }
       }
     }
   }

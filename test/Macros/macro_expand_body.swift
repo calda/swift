@@ -113,11 +113,23 @@ var computedVar: Bool {
   return true
 }
 
-var computedVarWithMacroOnGetter: Bool {
+var computedVarWithExplicitGetter: Bool {
   @Print
   get {
-    print("hello from computedVarWithMacroOnGetter")
+    print("hello from computedVarWithExplicitGetter")
     return true
+  }
+}
+
+var computedVarWithGetterAndSetter: Bool {
+  @Print
+  get {
+    print("hello from computedVarWithGetterAndSetter")
+    return true
+  }
+  @Print
+  set {
+    print("Hello from setter: \(newValue)")
   }
 }
 
@@ -127,6 +139,16 @@ var computedVarWithMacroOnGetter: Bool {
 _ = computedVar
 
 // CHECK: start body (from macro)
-// CHECK-NEXT: hello from computedVarWithMacroOnGetter
+// CHECK-NEXT: hello from computedVarWithExplicitGetter
 // CHECK-NEXT: end body (from macro)
-_ = computedVarWithMacroOnGetter
+_ = computedVarWithExplicitGetter
+
+// CHECK: start body (from macro)
+// CHECK-NEXT: hello from computedVarWithGetterAndSetter
+// CHECK-NEXT: end body (from macro)
+_ = computedVarWithGetterAndSetter
+
+// CHECK: start body (from macro)
+// CHECK-NEXT: Hello from setter: false
+// CHECK-NEXT: end body (from macro)
+computedVarWithGetterAndSetter = false
