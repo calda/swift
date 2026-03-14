@@ -585,7 +585,8 @@ bool swift::isInvalidAttachedMacro(MacroRole role,
 
   case MacroRole::Preamble:
   case MacroRole::Body:
-    // Only function declarations or computed variables (with only a getter, but no setter)
+    // Only function declarations or computed variables (with only a getter, but
+    // no setter)
     if (isa<AbstractFunctionDecl>(attachedTo))
       return false;
 
@@ -1957,12 +1958,12 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
 
     SourceFile *macroSourceFile = nullptr;
     if (auto *fnDecl = fn.getAbstractFunctionDecl()) {
-      macroSourceFile = ::evaluateAttachedMacro(
-          macro, fnDecl, customAttr, false, MacroRole::Body);
+      macroSourceFile = ::evaluateAttachedMacro(macro, fnDecl, customAttr,
+                                                false, MacroRole::Body);
     } else if (auto *closure =
-        dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
-      macroSourceFile = ::evaluateAttachedMacro(
-          macro, closure, customAttr, MacroRole::Body);
+                   dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
+      macroSourceFile =
+          ::evaluateAttachedMacro(macro, closure, customAttr, MacroRole::Body);
     }
 
     if (!macroSourceFile)
@@ -1977,7 +1978,7 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
     if (auto *accessor = dyn_cast<AccessorDecl>(functionDecl)) {
       if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
         var->forEachAttachedMacro(MacroRole::Body, expandMacro);
-        
+
         if (bufferID) {
           return bufferID;
         }

@@ -232,12 +232,12 @@ uniqueBorrow.propertyWithYieldingBorrowYieldingMutate = 10
 // CHECK: start body (from macro)
 // CHECK-NEXT: Hello from borrow
 // CHECK-NEXT: end body (from macro)
-_ = uniqueBorrow.propertyWithYieldingBorrowYieldingMutate
+_ = uniqueBorrow.propertyWithBorrowMutate
 
 // CHECK: start body (from macro)
 // CHECK-NEXT: Hello from mutate
 // CHECK-NEXT: end body (from macro)
-uniqueBorrow.propertyWithYieldingBorrowYieldingMutate = 10
+uniqueBorrow.propertyWithBorrowMutate = 10
 
 #if compiler(>=6.0) && TEST_DIAGNOSTICS
 @Print // expected-error {{'body' macro cannot be attached to var ('storedVar')}}
@@ -256,7 +256,7 @@ var storedVarWithWillSetDidSetAttachedMacro = false {
   }
 }
 
-@Print // expected-error {{'body' macro cannot be attached to var ('storedVarWithExplicitGetAndAttachedMacro')}}
+@Print // expected-error {{'body' macro cannot be attached to var ('storedVarWithExplicitGetSetAndAttachedMacro'}}
 var storedVarWithExplicitGetSetAndAttachedMacro: Bool {
   get {
     print("Hello from storedVarWithGetAndAttachedMacro")
@@ -280,7 +280,7 @@ struct InvalidUniqueBorrow: ~Copyable {
     }
   }
   
-  @Print // expected-error {{unexpected error produced: 'body' macro cannot be attached to property ('propertyWithBorrowMutate')}}
+  @Print // expected-error {{'body' macro cannot be attached to property ('propertyWithBorrowMutate'}}
   var propertyWithBorrowMutate: Int {
     borrow {
       return x

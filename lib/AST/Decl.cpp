@@ -544,7 +544,7 @@ unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
     if (foundDiscriminator) {
       return *foundDiscriminator;
     }
-    
+
     // For computed properties with only an implicit get,
     // the attr is on the parent VarDecl.
     if (role == MacroRole::Body) {
