@@ -339,6 +339,14 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::Body: {
       auto expansion = SF->getMacroExpansion();
       if (isa<Decl *>(expansion)) {
+        // For a body macro on a var with no accessor block, the expansion is
+        // attached to the VarDecl (which has a valid source location). Use the
+        // insertion range to find the parent scope, with no bodyForDecl.
+        if (isa<VarDecl>(cast<Decl *>(expansion))) {
+          auto insertionRange = SF->getMacroInsertionRange();
+          parentLoc = insertionRange.Start;
+          break;
+        }
         // Use the end location of the function decl itself as the parentLoc
         // for the new function body scope. This is different from the end
         // location of the original source range, which is after the end of the

@@ -4181,6 +4181,16 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
         if (foundObserver && storage->getAttrs().hasAttribute<OverrideAttr>())
           hasStorage = false;
       });
+
+  // A body macro on a var with no accessor block and no initializer synthesizes
+  // the getter body, turning the property into a computed getter-only property.
+  if (hasStorage && !var->getBracesRange().isValid() &&
+      !var->getParentExecutableInitializer()) {
+    namelookup::forEachPotentialAttachedMacro(
+        var, MacroRole::Body,
+        [&](MacroDecl *, const MacroRoleAttr *) { hasStorage = false; });
+  }
+
   return hasStorage;
 }
 
@@ -4297,6 +4307,35 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   // Expand any attached accessor macros.
   (void)evaluateOrDefault(evaluator, ExpandAccessorMacros{storage}, { });
+
+  // For a var with a body macro and no accessor block, synthesize an implicit
+  // getter so the body macro can provide its implementation. Return early with
+  // a getter-only computed impl — we don't go through the getParsedAccessor
+  // path below because synthesized (implicit) accessors are invisible to it.
+  if (auto *var = dyn_cast<VarDecl>(storage)) {
+    if (!storage->getBracesRange().isValid() &&
+        !storage->getParsedAccessor(AccessorKind::Get) &&
+        !var->getParentExecutableInitializer()) {
+      bool hasBodyMacro = false;
+      namelookup::forEachPotentialAttachedMacro(
+          var, MacroRole::Body,
+          [&](MacroDecl *, const MacroRoleAttr *) { hasBodyMacro = true; });
+      if (hasBodyMacro) {
+        auto &ctx = storage->getASTContext();
+        auto *getter = AccessorDecl::createImplicit(
+            ctx, AccessorKind::Get, var,
+            /*async=*/false, /*throws=*/false, TypeLoc(),
+            var->getValueInterfaceType(), var->getDeclContext());
+        getter->setParameters(ParameterList::createEmpty(ctx));
+        var->setSynthesizedAccessor(AccessorKind::Get, getter);
+
+        StorageImplInfo info(ReadImplKind::Get, WriteImplKind::Immutable,
+                             ReadWriteImplKind::Immutable);
+        finishStorageImplInfo(storage, info);
+        return info;
+      }
+    }
+  }
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);

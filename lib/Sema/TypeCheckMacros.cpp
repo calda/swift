@@ -590,9 +590,17 @@ bool swift::isInvalidAttachedMacro(MacroRole role,
     if (isa<AbstractFunctionDecl>(attachedTo))
       return false;
 
-    if (auto *var = dyn_cast<VarDecl>(attachedTo))
+    if (auto *var = dyn_cast<VarDecl>(attachedTo)) {
+      // Computed getter-only property: body macro can wrap the getter.
       if (!var->hasStorage() && !var->isSettable(/*useDC=*/nullptr))
         return false;
+
+      // Stored var with no accessor block and no initializer: body macro can
+      // synthesize the getter body, turning it into a computed property.
+      if (var->hasStorage() && !var->getParentExecutableInitializer() &&
+          !var->getBracesRange().isValid())
+        return false;
+    }
 
     break;
   }
@@ -988,6 +996,18 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
 
       // If we have an empty body, just use the end loc.
       return CharSourceRange(closure->getEndLoc(), 0);
+    }
+
+    // Body macro on a stored var with no accessor block: target is the VarDecl
+    // (passed as attachedTo from ExpandBodyMacroRequest). The expansion is
+    // logically inserted after the var declaration.
+    if (auto *var = dyn_cast<VarDecl>(cast<Decl *>(target))) {
+      SourceLoc endLoc;
+      if (auto *binding = var->getParentPatternBinding())
+        endLoc = binding->getEndLoc();
+      else
+        endLoc = var->getEndLoc();
+      return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, endLoc), 0);
     }
 
     // If the function has a body, that's what's being replaced.
@@ -1977,7 +1997,25 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
   if (auto *functionDecl = fn.getAbstractFunctionDecl()) {
     if (auto *accessor = dyn_cast<AccessorDecl>(functionDecl)) {
       if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
-        var->forEachAttachedMacro(MacroRole::Body, expandMacro);
+        // For a synthesized accessor with no source location, pass the VarDecl
+        // as `attachedTo` rather than the getter. This mirrors how accessor
+        // macros work: the VarDecl has a valid source location, so the source
+        // file lookup succeeds, the plugin receives VariableDeclSyntax, and
+        // the GeneratedSourceInfo.astNode has a valid start location for the
+        // availability scope machinery.
+        if (accessor->getLoc().isInvalid()) {
+          var->forEachAttachedMacro(
+              MacroRole::Body, [&](CustomAttr *customAttr, MacroDecl *macro) {
+                if (bufferID)
+                  return;
+                auto *sf = ::evaluateAttachedMacro(macro, var, customAttr,
+                                                   false, MacroRole::Body);
+                if (sf)
+                  bufferID = sf->getBufferID();
+              });
+        } else {
+          var->forEachAttachedMacro(MacroRole::Body, expandMacro);
+        }
 
         if (bufferID) {
           return bufferID;

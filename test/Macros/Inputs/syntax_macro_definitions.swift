@@ -2755,6 +2755,55 @@ public struct PrintBodyMacro: BodyMacro {
   }
 }
 
+public struct GenerateBodyMacro: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    // Declaration is a named function — use its name directly.
+    if let funcDecl = declaration.as(FunctionDeclSyntax.self) {
+      return ["\(literal: funcDecl.name.text)"]
+    }
+    // Declaration is a variable decl — use the first binding's name.
+    if let varDecl = declaration.as(VariableDeclSyntax.self),
+       let ident = varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self) {
+      return ["\(literal: ident.identifier.text)"]
+    }
+    // Declaration is an accessor — use lexicalContext to find the enclosing var.
+    if declaration.is(AccessorDeclSyntax.self),
+       let varDecl = context.lexicalContext.first?.as(VariableDeclSyntax.self),
+       let ident = varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self) {
+      return ["\(literal: ident.identifier.text)"]
+    }
+    return ["\"missing-parent-context\""]
+  }
+}
+
+public struct GenerateAccessorMacro: AccessorMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    // Declaration is a variable decl — use the first binding's name.
+    if let varDecl = declaration.as(VariableDeclSyntax.self),
+       let ident = varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self) {
+      let name = ident.identifier.text
+      return [
+        """
+        get { \(literal: name) }
+        """
+      ]
+    }
+    return [
+      """
+      get { "missing-parent-context" }
+      """
+    ]
+  }
+}
+
 @_spi(ExperimentalLanguageFeatures)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(

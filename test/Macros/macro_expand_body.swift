@@ -19,6 +19,9 @@ macro Remote() = #externalMacro(module: "MacroDefinition", type: "RemoteBodyMacr
 @attached(body)
 macro Print() = #externalMacro(module: "MacroDefinition", type: "PrintBodyMacro")
 
+@attached(body)
+macro Generate() = #externalMacro(module: "MacroDefinition", type: "GenerateBodyMacro")
+
 @attached(preamble)
 macro Traced() = #externalMacro(module: "MacroDefinition", type: "TracedPreambleMacro")
 
@@ -239,10 +242,14 @@ _ = uniqueBorrow.propertyWithBorrowMutate
 // CHECK-NEXT: end body (from macro)
 uniqueBorrow.propertyWithBorrowMutate = 10
 
-#if compiler(>=6.0) && TEST_DIAGNOSTICS
-@Print // expected-error {{'body' macro cannot be attached to var ('storedVar')}}
-var storedVar: Bool
+// Body macro on a stored var with no accessor block synthesizes the getter.
+@Generate
+var generatedVar: String
 
+// CHECK: generatedVar
+print(generatedVar)
+
+#if compiler(>=6.0) && TEST_DIAGNOSTICS
 @Print // expected-error {{'body' macro cannot be attached to var ('storedVarWithDefault')}}
 var storedVarWithDefault = false
 
